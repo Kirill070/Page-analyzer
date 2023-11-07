@@ -2,6 +2,8 @@
 
 namespace App;
 
+use Carbon\Carbon;
+
 class DBQuery
 {
     private $pdo;
@@ -13,11 +15,12 @@ class DBQuery
 
     public function insert(string $name)
     {
-        $sql = 'INSERT INTO urls(name) VALUES(:name)';
+        $sql = 'INSERT INTO urls(name, created_at) VALUES(:name, :created_at)';
 
         $stmt = $this->pdo->prepare($sql);
 
         $stmt->bindValue(':name', $name);
+        $stmt->bindValue(':created_at', Carbon::now());
 
         $stmt->execute();
 
