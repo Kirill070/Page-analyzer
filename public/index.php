@@ -91,9 +91,9 @@ $app->get('/urls/{id}', function ($request, $response, array $args) use ($query)
 })->setName('url');
 
 $app->get('/urls', function ($request, $response) use ($query) {
-    $selectedAll = $query->selectAll();
+    $selectedCheck = $query->selectCheck();
 
-    $params = ['data' => $selectedAll];
+    $params = ['data' => $selectedCheck];
     return $this->get('renderer')->render($response, "list.phtml", $params);
 })->setName('urls');
 
