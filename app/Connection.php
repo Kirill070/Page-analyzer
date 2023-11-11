@@ -2,38 +2,30 @@
 
 namespace App;
 
-/**
- * Создание класса Connection
- */
 final class Connection
 {
-    /**
-     * Connection
-     * тип @var
-     */
     private static ?Connection $conn = null;
 
-    /**
-     * Подключение к базе данных и возврат экземпляра объекта \PDO
-     * @return \PDO
-     * @throws \Exception
-     */
     public function connect()
     {
-        // чтение параметров в файле конфигурации ini
-        $params = parse_ini_file('database.ini');
+        $params = parse_url($_ENV['DATABASE_URL']);
         if ($params === false) {
-            throw new \Exception("Error reading database configuration file");
+            throw new \Exception("Error reading database url");
         }
 
-        // подключение к базе данных postgresql
+        $username = $databaseUrl['user'];
+        $password = $databaseUrl['pass'];
+        $host = $databaseUrl['host'];
+        $port = isset($databaseUrl['port']) ? $databaseUrl['port'] : '';
+        $dbName = ltrim($databaseUrl['path'], '/');
+
         $conStr = sprintf(
             "pgsql:host=%s;port=%d;dbname=%s;user=%s;password=%s",
-            $params['host'],
-            $params['port'],
-            $params['database'],
-            $params['user'],
-            $params['password']
+            $host,
+            $port,
+            $dbName,
+            $username,
+            $password
         );
 
         $pdo = new \PDO($conStr);
@@ -42,10 +34,6 @@ final class Connection
         return $pdo;
     }
 
-    /**
-     * возврат экземпляра объекта Connection
-     * тип @return
-     */
     public static function get()
     {
         if (null === static::$conn) {

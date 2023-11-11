@@ -5,15 +5,17 @@ require __DIR__ . '/../vendor/autoload.php';
 use Slim\Factory\AppFactory;
 use DI\Container;
 use App\Connection;
-use App\DBQuery;
-
+use Carbon\Carbon;
 use Valitron\Validator;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Exception\ConnectException;
+use DiDom\Document;
 
 session_start();
 
 try {
     Connection::get()->connect();
-    echo 'A connection to the PostgreSQL database sever has been established successfully.';
 } catch (\PDOException $e) {
     echo $e->getMessage();
 }
@@ -27,19 +29,20 @@ $container->set('flash', function () {
     return new \Slim\Flash\Messages();
 });
 
+$container->set('pdo', function () {
+    return Connection::get()->connect();
+});
+
 $app = AppFactory::createFromContainer($container);
 $app->addErrorMiddleware(true, true, true);
 
 $router = $app->getRouteCollector()->getRouteParser();
 
-$pdo = Connection::get()->connect();
-$query = new DBQuery($pdo);
-
 $app->get('/', function ($request, $response) {
     return $this->get('renderer')->render($response, 'index.phtml');
 })->setName('/');
 
-$app->post('/urls', function ($request, $response) use ($query, $router) {
+$app->post('/urls', function ($request, $response) use ($router) {
     $url = $request->getParsedBodyParam('url');
 
     $validator = new Validator(['url' => $url['name']]);
@@ -58,49 +61,114 @@ $app->post('/urls', function ($request, $response) use ($query, $router) {
     $parsedUrl = parse_url(strtolower($url['name']));
     $urlName = "{$parsedUrl['scheme']}://{$parsedUrl['host']}";
 
-    $selectUrl = $query->selectURL($urlName);
+    $pdo = $this->get('pdo');
+    $sql = 'SELECT * FROM urls WHERE name = ?';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$urlName]);
+    $selectedUrl = $stmt->fetchAll();
 
-    if (!$selectUrl) {
-        $id = $query->insert($urlName);
+    if (!$selectedUrl) {
+        $sql = 'INSERT INTO urls(name, created_at) VALUES(?, ?)';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$urlName, Carbon::now()]);
+        $id = $pdo->lastInsertId('urls_id_seq');
         $this->get('flash')->addMessage('success', 'Страница успешно добавлена');
     } else {
-        $id = $selectUrl[0]['id'];
+        $id = $selectedUrl[0]['id'];
         $this->get('flash')->addMessage('success', 'Страница уже существует');
     }
     return $response->withRedirect($router->urlFor('url', ['id' => $id]), 302);
 });
 
-$app->get('/urls/{id}', function ($request, $response, array $args) use ($query) {
+$app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
     $id = $args['id'];
-
     $messages = $this->get('flash')->getMessages();
 
-    $selectUrl = $query->selectID($id);
-    $selectUrlID = $query->selectUrlID($id);
+    $pdo = $this->get('pdo');
+    $sql = 'SELECT * FROM urls WHERE id = ?';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$id]);
+    $selectedUrl = $stmt->fetch();
 
-        $alert = array_key_first($messages);
-        $flash = $messages[$alert][0];
+    $sql = 'SELECT * FROM url_checks WHERE url_id = ? ORDER BY created_at DESC';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$id]);
+    $selectedUrlCheck = $stmt->fetchAll();
 
-        $params = [
-            'flash' => $flash,
-            'alert' => $alert,
-            'url' => $selectUrl,
-            'checks' => $selectUrlID
-        ];
-        return $this->get('renderer')->render($response, 'url.phtml', $params);
+    $alert = array_key_first($messages);
+    $flash = $messages[$alert][0];
+
+    $params = [
+        'flash' => $flash,
+        'alert' => $alert,
+        'url' => $selectedUrl,
+        'checks' => $selectedUrlCheck
+    ];
+    return $this->get('renderer')->render($response, 'show.phtml', $params);
 })->setName('url');
 
-$app->get('/urls', function ($request, $response) use ($query) {
-    $selectedCheck = $query->selectCheck();
+$app->get('/urls', function ($request, $response) {
+    $pdo = $this->get('pdo');
+    $sql = 'SELECT
+        urls.id AS id,
+        urls.name AS name,
+        MAX(url_checks.created_at) AS created_at,
+        url_checks.status_code AS status_code
+        FROM urls LEFT JOIN url_checks ON urls.id = url_checks.url_id
+        GROUP BY urls.id, status_code
+        ORDER BY id DESC';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute();
+    $urls = $stmt->fetchAll();
 
-    $params = ['data' => $selectedCheck];
+    $params = ['data' => $urls];
     return $this->get('renderer')->render($response, "list.phtml", $params);
 })->setName('urls');
 
-$app->post('/urls/{url_id}/checks', function ($request, $response, array $args) use ($query, $router) {
+$app->post('/urls/{url_id}/checks', function ($request, $response, array $args) use ($router) {
     $url_id = $args['url_id'];
 
-    $id = $query->insertCheck($url_id);
+    $pdo = $this->get('pdo');
+    $sql = 'SELECT name FROM urls WHERE id = ?';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$url_id]);
+    $url = $stmt->fetch();
+
+    $client = new Client();
+
+    try {
+        $res = $client->get($url['name']);
+        $statusCode = $response->getStatusCode();
+        $message = 'Страница успешно проверена';
+        $this->get('flash')->addMessage('success', $message);
+    } catch (ConnectException $e) {
+        $message = 'Произошла ошибка при проверке, не удалось подключиться';
+        $this->get('flash')->addMessage('danger', $message);
+        return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
+    } catch (RequestException $e) {
+        $statusCode = $e->getResponse()->getStatusCode();
+        $message = 'Проверка была выполнена успешно, но сервер ответил c ошибкой';
+        $this->get('flash')->clearMessages();
+        $this->get('flash')->addMessage('warning', $message);
+    }
+
+    $document = new Document($url['name'], true);
+    $h1 = optional($document->first('h1'))->text();
+    $title = optional($document->first('title'))->text();
+    $description = optional($document->first('meta[name=description]'))->attr('content');
+
+    $sql = 'INSERT INTO url_checks(
+        url_id,
+        status_code,
+        h1, 
+        title, 
+        description,
+        created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$url_id, $statusCode, $h1, $title, $description, Carbon::now()]);
+    $id = $pdo->lastInsertId('url_checks_id_seq');
 
     return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
 });
