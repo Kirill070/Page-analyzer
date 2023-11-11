@@ -95,8 +95,8 @@ $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
     $stmt->execute([$id]);
     $selectedUrlCheck = $stmt->fetchAll();
 
-    $alert = array_key_first($messages);
-    $flash = $messages[$alert][0];
+    $alert = array_key_first($messages) ?? '';
+    $flash = $messages[$alert][0] ?? '';
 
     $params = [
         'flash' => $flash,
@@ -145,6 +145,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
         $this->get('flash')->addMessage('danger', $message);
         return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
     } catch (RequestException $e) {
+        $res = $e->getResponse();
         $message = 'Проверка была выполнена успешно, но сервер ответил c ошибкой';
         $this->get('flash')->clearMessages();
         $this->get('flash')->addMessage('warning', $message);

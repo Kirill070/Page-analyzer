@@ -2,13 +2,17 @@
 
 namespace App;
 
+use Dotenv\Dotenv;
+
 final class Connection
 {
     private static ?Connection $conn = null;
 
     public function connect()
     {
-        $databaseUrl = parse_url((string) getenv('DATABASE_URL'));
+        $dotenv = Dotenv::createImmutable(__DIR__ . '/../');
+        $dotenv->safeLoad();
+        $databaseUrl = parse_url($_ENV['DATABASE_URL']);
         if ($databaseUrl === false) {
             throw new \Exception("Error reading database url");
         }
