@@ -8,15 +8,15 @@ final class Connection
 
     public function connect()
     {
-        $params = parse_url($_ENV['DATABASE_URL']);
-        if ($params === false) {
+        $databaseUrl = parse_url($_ENV['DATABASE_URL']);
+        if ($databaseUrl === false) {
             throw new \Exception("Error reading database url");
         }
 
         $username = $databaseUrl['user'];
         $password = $databaseUrl['pass'];
         $host = $databaseUrl['host'];
-        $port = isset($databaseUrl['port']) ? $databaseUrl['port'] : '';
+        $port = $databaseUrl['port'];
         $dbName = ltrim($databaseUrl['path'], '/');
 
         $conStr = sprintf(
