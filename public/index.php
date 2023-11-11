@@ -138,7 +138,6 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
 
     try {
         $res = $client->get($url['name']);
-        $statusCode = $res->getStatusCode();
         $message = 'Страница успешно проверена';
         $this->get('flash')->addMessage('success', $message);
     } catch (ConnectException $e) {
@@ -146,13 +145,11 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
         $this->get('flash')->addMessage('danger', $message);
         return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
     } catch (RequestException $e) {
-        if ($e->hasResponse()) {
-            $statusCode = $e->getResponse()->getStatusCode();
-        }
         $message = 'Проверка была выполнена успешно, но сервер ответил c ошибкой';
         $this->get('flash')->clearMessages();
         $this->get('flash')->addMessage('warning', $message);
     }
+    $statusCode = $res->getStatusCode();
 
     $document = new Document($url['name'], true);
     $h1 = optional($document->first('h1'))->text();

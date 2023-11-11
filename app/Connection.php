@@ -8,6 +8,7 @@ final class Connection
 
     public function connect()
     {
+        var_dump(getenv('DATABASE_URL'));
         $databaseUrl = parse_url(getenv('DATABASE_URL'));
         if ($databaseUrl === false) {
             throw new \Exception("Error reading database url");
