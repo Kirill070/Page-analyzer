@@ -11,6 +11,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\ConnectException;
 use DiDom\Document;
+use Dotenv\Dotenv;
 
 session_start();
 
@@ -30,7 +31,26 @@ $container->set('flash', function () {
 });
 
 $container->set('pdo', function () {
-    return Connection::get()->connect();
+    $dotenv = Dotenv::createImmutable(__DIR__ . '/../');
+    $dotenv->safeLoad();
+    $databaseUrl = parse_url($_ENV['DATABASE_URL']);
+    if ($databaseUrl === false) {
+        throw new \Exception("Error reading database url");
+    }
+        $conStr = sprintf(
+            "pgsql:host=%s;port=%d;dbname=%s;user=%s;password=%s",
+            $databaseUrl['host'] ?? '',
+            $databaseUrl['port'] ?? '',
+            ltrim($databaseUrl['path'] ?? '', '/'),
+            $databaseUrl['user'] ?? '',
+            $databaseUrl['pass'] ?? ''
+        );
+
+    $pdo = new \PDO($conStr);
+    $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+    return $pdo;
+    //return Connection::get()->connect();
 });
 
 $app = AppFactory::createFromContainer($container);
