@@ -13,11 +13,12 @@ final class Connection
         $dotenv = Dotenv::createImmutable(__DIR__ . '/../');
         $dotenv->safeLoad();
         $databaseUrl = parse_url($_ENV['DATABASE_URL']);
+        var_dump($databaseUrl);
         if ($databaseUrl === false) {
             throw new \Exception("Error reading database url");
         }
 
-        $username = $databaseUrl['user'];
+        $username = $databaseUrl['user?'];
         $password = $databaseUrl['pass'];
         $host = $databaseUrl['host'];
         $dbName = ltrim($databaseUrl['path'], '/');

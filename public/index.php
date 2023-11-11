@@ -150,7 +150,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
         $this->get('flash')->clearMessages();
         $this->get('flash')->addMessage('warning', $message);
     }
-    $statusCode = $res->getStatusCode();
+    $statusCode = !is_null($res) ? $res->getStatusCode() : null;
 
     $document = new Document($url['name'], true);
     $h1 = optional($document->first('h1'))->text();
