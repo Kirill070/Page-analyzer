@@ -3,6 +3,7 @@
 require __DIR__ . '/../vendor/autoload.php';
 
 use Slim\Factory\AppFactory;
+use Slim\Middleware\MethodOverrideMiddleware;
 use DI\Container;
 use App\Connection;
 use Carbon\Carbon;
@@ -15,11 +16,11 @@ use Dotenv\Dotenv;
 
 session_start();
 
-try {
-    Connection::get()->connect();
-} catch (\PDOException $e) {
-    echo $e->getMessage();
-}
+// try {
+//     Connection::get()->connect();
+// } catch (\PDOException $e) {
+//     echo $e->getMessage();
+// }
 
 $container = new Container();
 $container->set('renderer', function () {
@@ -45,7 +46,7 @@ $container->set('pdo', function () {
     $dbPassword = $databaseUrl['pass'];
 
     $conStr = sprintf(
-        "postgres:host=%s;port=%d;dbname=%s;user=%s;password=%s",
+        "pgsql:host=%s;port=%d;dbname=%s;user=%s;password=%s",
         $dbHost,
         $dbPort,
         $dbName,
