@@ -31,23 +31,31 @@ $container->set('flash', function () {
 });
 
 $container->set('pdo', function () {
-    $dotenv = Dotenv::createImmutable(__DIR__ . '/../');
+    $dotenv = Dotenv::createImmutable(__DIR__ . './../');
     $dotenv->safeLoad();
+
     $databaseUrl = parse_url($_ENV['DATABASE_URL']);
-    if ($databaseUrl === false) {
+    if (!$databaseUrl) {
         throw new \Exception("Error reading database url");
     }
-        $conStr = sprintf(
-            "pgsql:host=%s;port=%d;dbname=%s;user=%s;password=%s",
-            $databaseUrl['host'] ?? '',
-            $databaseUrl['port'] ?? '',
-            ltrim($databaseUrl['path'] ?? '', '/'),
-            $databaseUrl['user'] ?? '',
-            $databaseUrl['pass'] ?? ''
-        );
+    $dbHost = $databaseUrl['host'];
+    $dbPort = $databaseUrl['port'];
+    $dbName = ltrim($databaseUrl['path'], '/');
+    $dbUser = $databaseUrl['user'];
+    $dbPassword = $databaseUrl['pass'];
+
+    $conStr = sprintf(
+        "postgres:host=%s;port=%d;dbname=%s;user=%s;password=%s",
+        $dbHost,
+        $dbPort,
+        $dbName,
+        $dbUser,
+        $dbPassword
+    );
 
     $pdo = new \PDO($conStr);
     $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+    $pdo->setAttribute(\PDO::ATTR_DEFAULT_FETCH_MODE, \PDO::FETCH_ASSOC);
 
     return $pdo;
     //return Connection::get()->connect();
