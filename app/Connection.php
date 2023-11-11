@@ -18,7 +18,7 @@ final class Connection
             throw new \Exception("Error reading database url");
         }
 
-        $username = $databaseUrl['user?'];
+        $username = $databaseUrl['user'];
         $password = $databaseUrl['pass'];
         $host = $databaseUrl['host'];
         $dbName = ltrim($databaseUrl['path'], '/');
