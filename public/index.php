@@ -5,7 +5,6 @@ require __DIR__ . '/../vendor/autoload.php';
 use Slim\Factory\AppFactory;
 use Slim\Middleware\MethodOverrideMiddleware;
 use DI\Container;
-use App\Connection;
 use Carbon\Carbon;
 use Valitron\Validator;
 use GuzzleHttp\Client;
@@ -15,12 +14,6 @@ use DiDom\Document;
 use Dotenv\Dotenv;
 
 session_start();
-
-// try {
-//     Connection::get()->connect();
-// } catch (\PDOException $e) {
-//     echo $e->getMessage();
-// }
 
 $container = new Container();
 $container->set('renderer', function () {
@@ -39,27 +32,36 @@ $container->set('pdo', function () {
     if (!$databaseUrl) {
         throw new \Exception("Error reading database url");
     }
-    $dbHost = $databaseUrl['host'];
-    $dbPort = $databaseUrl['port'];
-    $dbName = ltrim($databaseUrl['path'], '/');
-    $dbUser = $databaseUrl['user'];
-    $dbPassword = $databaseUrl['pass'];
+    $host = $databaseUrl['host'];
+    $port = $databaseUrl['port'];
+    $name = ltrim($databaseUrl['path'], '/');
+    $user = $databaseUrl['user'];
+    $pass = $databaseUrl['pass'];
 
-    $conStr = sprintf(
-        "pgsql:host=%s;port=%d;dbname=%s;user=%s;password=%s",
-        $dbHost,
-        $dbPort,
-        $dbName,
-        $dbUser,
-        $dbPassword
-    );
+    if ($port) {
+        $conStr = sprintf(
+            "pgsql:host=%s;port=%d;dbname=%s;user=%s;password=%s",
+            $host,
+            $port,
+            $name,
+            $user,
+            $pass
+        );
+    } else {
+        $conStr = sprintf(
+            "pgsql:host=%s;dbname=%s;user=%s;password=%s",
+            $host,
+            $name,
+            $user,
+            $pass
+        );
+    }
 
     $pdo = new \PDO($conStr);
     $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(\PDO::ATTR_DEFAULT_FETCH_MODE, \PDO::FETCH_ASSOC);
 
     return $pdo;
-    //return Connection::get()->connect();
 });
 
 $app = AppFactory::createFromContainer($container);
@@ -81,25 +83,25 @@ $app->post('/urls', function ($request, $response) use ($router) {
 
     if (!$validator->validate()) {
         $params = [
-            'request' => $url['name'],
+            'url' => $url['name'],
             'errors' => $validator->errors(),
         ];
         return $this->get('renderer')->render($response->withStatus(422), 'index.phtml', $params);
     }
 
     $parsedUrl = parse_url(strtolower($url['name']));
-    $urlName = "{$parsedUrl['scheme']}://{$parsedUrl['host']}";
+    $normalizedUrl = "{$parsedUrl['scheme']}://{$parsedUrl['host']}";
 
     $pdo = $this->get('pdo');
     $sql = 'SELECT * FROM urls WHERE name = ?';
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$urlName]);
+    $stmt->execute([$normalizedUrl]);
     $selectedUrl = $stmt->fetchAll();
 
     if (!$selectedUrl) {
         $sql = 'INSERT INTO urls(name, created_at) VALUES(?, ?)';
         $stmt = $pdo->prepare($sql);
-        $stmt->execute([$urlName, Carbon::now()]);
+        $stmt->execute([$normalizedUrl, Carbon::now()]);
         $id = $pdo->lastInsertId('urls_id_seq');
         $this->get('flash')->addMessage('success', 'Страница успешно добавлена');
     } else {
@@ -161,12 +163,12 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
     $sql = 'SELECT name FROM urls WHERE id = ?';
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$url_id]);
-    $url = $stmt->fetch();
+    $selectedUrl = $stmt->fetch();
 
     $client = new Client();
 
     try {
-        $res = $client->get($url['name']);
+        $res = $client->get($selectedUrl['name']);
         $message = 'Страница успешно проверена';
         $this->get('flash')->addMessage('success', $message);
     } catch (ConnectException $e) {
@@ -181,7 +183,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
     }
     $statusCode = !is_null($res) ? $res->getStatusCode() : null;
 
-    $document = new Document($url['name'], true);
+    $document = new Document($selectedUrl['name'], true);
     $h1 = optional($document->first('h1'))->text();
     $title = optional($document->first('title'))->text();
     $description = optional($document->first('meta[name=description]'))->attr('content');
