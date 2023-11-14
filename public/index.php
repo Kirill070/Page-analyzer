@@ -34,7 +34,7 @@ $container->set('pdo', function () {
     }
     $host = $databaseUrl['host'] ?? '';
     $port = $databaseUrl['port'] ?? '';
-    $name = (ltrim($databaseUrl['path'], '/')) ?? '';
+    $name = $databaseUrl['path'] ? ltrim($databaseUrl['path'], '/') : '';
     $user = $databaseUrl['user'] ?? '';
     $pass = $databaseUrl['pass'] ?? '';
 
