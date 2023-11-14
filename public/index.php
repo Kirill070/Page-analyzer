@@ -32,11 +32,11 @@ $container->set('pdo', function () {
     if (!$databaseUrl) {
         throw new \Exception("Error reading database url");
     }
-    $host = $databaseUrl['host'];
-    $port = $databaseUrl['port'];
-    $name = ltrim($databaseUrl['path'], '/');
-    $user = $databaseUrl['user'];
-    $pass = $databaseUrl['pass'];
+    $host = $databaseUrl['host'] ?? '';
+    $port = $databaseUrl['port'] ?? '';
+    $name = (ltrim($databaseUrl['path'], '/')) ?? '';
+    $user = $databaseUrl['user'] ?? '';
+    $pass = $databaseUrl['pass'] ?? '';
 
     if ($port) {
         $conStr = sprintf(
@@ -65,7 +65,7 @@ $container->set('pdo', function () {
 });
 
 $app = AppFactory::createFromContainer($container);
-$app->addErrorMiddleware(true, true, true);
+$app->addErrorMiddleware(false, true, true);
 
 $router = $app->getRouteCollector()->getRouteParser();
 
@@ -113,6 +113,7 @@ $app->post('/urls', function ($request, $response) use ($router) {
 
 $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
     $id = $args['id'];
+
     $messages = $this->get('flash')->getMessages();
 
     $pdo = $this->get('pdo');
@@ -120,6 +121,10 @@ $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$id]);
     $selectedUrl = $stmt->fetch();
+
+    if (!$selectedUrl) {
+        return $response->withStatus(404)->write('Page not found');
+    }
 
     $sql = 'SELECT * FROM url_checks WHERE url_id = ? ORDER BY created_at DESC';
     $stmt = $pdo->prepare($sql);
