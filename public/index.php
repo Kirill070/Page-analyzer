@@ -174,12 +174,6 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
 
     try {
         $res = $client->get($selectedUrl['name']);
-        
-        if ($res->getStatusCode() === 403) {
-            $message = 'Доступ к ресурсу запрещен';
-            $this->get('flash')->addMessage('danger', $message);
-            return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
-        }
 
         $message = 'Страница успешно проверена';
         $this->get('flash')->addMessage('success', $message);
