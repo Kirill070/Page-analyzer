@@ -176,35 +176,38 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
         $res = $client->get($selectedUrl['name']);
         $message = 'Страница успешно проверена';
         $this->get('flash')->addMessage('success', $message);
+
+        $statusCode = $res->getStatusCode();
+
+        $document = new Document($selectedUrl['name'], true);
+        $h1 = optional($document->first('h1'))->text();
+        $title = optional($document->first('title'))->text();
+        $description = optional($document->first('meta[name=description]'))->attr('content');
+
+        $sql = 'INSERT INTO url_checks(
+            url_id,
+            status_code,
+            h1, 
+            title, 
+            description,
+            created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$url_id, $statusCode, $h1, $title, $description, Carbon::now()]);
+        $id = $pdo->lastInsertId('url_checks_id_seq');
+
+        return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
     } catch (ConnectException $e) {
         $message = 'Произошла ошибка при проверке, не удалось подключиться';
         $this->get('flash')->addMessage('danger', $message);
-        return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
     } catch (RequestException $e) {
-        $res = $e->getResponse();
-        $message = 'Проверка была выполнена успешно, но сервер ответил c ошибкой';
-        $this->get('flash')->clearMessages();
+        $message = 'Проверка была выполнена успешно, но сервер ответил с ошибкой';
         $this->get('flash')->addMessage('warning', $message);
+    } catch (Exception $e) {
+        $message = 'Произошла неизвестная ошибка';
+        $this->get('flash')->addMessage('danger', $message);
     }
-    $statusCode = !is_null($res) ? $res->getStatusCode() : null;
-
-    $document = new Document($selectedUrl['name'], true);
-    $h1 = optional($document->first('h1'))->text();
-    $title = optional($document->first('title'))->text();
-    $description = optional($document->first('meta[name=description]'))->attr('content');
-
-    $sql = 'INSERT INTO url_checks(
-        url_id,
-        status_code,
-        h1, 
-        title, 
-        description,
-        created_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?)';
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$url_id, $statusCode, $h1, $title, $description, Carbon::now()]);
-    $id = $pdo->lastInsertId('url_checks_id_seq');
 
     return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
 });
