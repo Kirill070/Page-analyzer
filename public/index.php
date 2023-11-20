@@ -10,6 +10,7 @@ use Valitron\Validator;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\ServerException;
 use DiDom\Document;
 use Dotenv\Dotenv;
 
@@ -174,43 +175,54 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
 
     try {
         $res = $client->get($selectedUrl['name']);
-
+        $html = $res->getBody()->getContents();
         $message = 'Страница успешно проверена';
         $this->get('flash')->addMessage('success', $message);
 
-        $statusCode = $res->getStatusCode();
-
-        $document = new Document($selectedUrl['name'], true);
+        $document = new Document();
+        $document->loadHtml($html);
         $h1 = optional($document->first('h1'))->text();
         $title = optional($document->first('title'))->text();
         $description = optional($document->first('meta[name=description]'))->attr('content');
-
-        $sql = 'INSERT INTO url_checks(
-            url_id,
-            status_code,
-            h1, 
-            title, 
-            description,
-            created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?)';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$url_id, $statusCode, $h1, $title, $description, Carbon::now()]);
-        $id = $pdo->lastInsertId('url_checks_id_seq');
-
-        return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
     } catch (ConnectException $e) {
         $message = 'Произошла ошибка при проверке, не удалось подключиться';
         $this->get('flash')->addMessage('danger', $message);
-    } catch (RequestException $e) {
+        return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
+    } catch (ClientException $e) {
+        if ($e->hasResponse()) {
+            $res = $e->hasResponse();
+        }
+        $h1 = 'Доступ ограничен: проблема с IP';
+        $title = 'Доступ ограничен: проблема с IP';
+        $description = '';
         $message = 'Проверка была выполнена успешно, но сервер ответил с ошибкой';
         $this->get('flash')->addMessage('warning', $message);
-    } catch (Exception $e) {
-        $message = 'Произошла неизвестная ошибка';
-        $this->get('flash')->addMessage('danger', $message);
+    } catch (ServerException $e) {
+        $message = 'Проверка была выполнена успешно, но сервер ответил с ошибкой';
+        $this->get('flash')->addMessage('warning', $message);
+        return $this->get('renderer')->render($response, '500.phtml');
     }
 
+    $statusCode = $res ? $res->getStatusCode() : '';
+
+    $sql = 'INSERT INTO url_checks(
+        url_id,
+        status_code,
+        h1, 
+        title, 
+        description,
+        created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$url_id, $statusCode, $h1, $title, $description, Carbon::now()]);
+    $id = $pdo->lastInsertId('url_checks_id_seq');
+
     return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
+
+    $app->get('/{slug}', function ($request, $response, array $args) {
+        return $this->get('renderer')->render($response, '404.phtml');
+    })->setName('404');
 });
 
 $app->run();
