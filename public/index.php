@@ -202,7 +202,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
         return $this->get('renderer')->render($response, '500.phtml');
     }
 
-    $statusCode = !is_null($res) ? $res->getStatusCode() : null;
+    $statusCode = $res ? $res->getStatusCode() : null;
 
     $sql = 'INSERT INTO url_checks(
         url_id,
@@ -218,10 +218,6 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
     $id = $pdo->lastInsertId('url_checks_id_seq');
 
     return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
-
-    $app->get('/{slug}', function ($request, $response, array $args) {
-        return $this->get('renderer')->render($response, '404.phtml');
-    })->setName('404');
 });
 
 $app->run();
