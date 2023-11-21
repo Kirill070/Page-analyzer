@@ -178,6 +178,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
     try {
         $res = $client->get($selectedUrl['name']);
         $html = (string) $res->getBody();
+        $statusCode = $res->getStatusCode();
         $message = 'Страница успешно проверена';
         $this->get('flash')->addMessage('success', $message);
 
@@ -191,6 +192,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
         return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
     } catch (ClientException $e) {
         $res = Psr7\Message::toString($e->getResponse());
+        $statusCode = $res->getStatusCode();
         $h1 = 'Доступ ограничен: проблема с IP';
         $title = 'Доступ ограничен: проблема с IP';
         $description = '';
@@ -201,8 +203,6 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
         $this->get('flash')->addMessage('warning', $message);
         return $this->get('renderer')->render($response, '500.phtml');
     }
-
-    $statusCode = $res ? $res->getStatusCode() : null;
 
     $sql = 'INSERT INTO url_checks(
         url_id,
