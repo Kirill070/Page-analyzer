@@ -11,6 +11,8 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\ServerException;
+use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Psr7;
 use DiDom\Document;
 use Dotenv\Dotenv;
 
@@ -188,9 +190,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
         $this->get('flash')->addMessage('danger', $message);
         return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
     } catch (ClientException $e) {
-        if ($e->hasResponse()) {
-            $res = $e->hasResponse();
-        }
+        $res = Psr7\Message::toString($e->getResponse());
         $h1 = 'Доступ ограничен: проблема с IP';
         $title = 'Доступ ограничен: проблема с IP';
         $description = '';
@@ -202,7 +202,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
         return $this->get('renderer')->render($response, '500.phtml');
     }
 
-    $statusCode = $res ? $res->getStatusCode() : '';
+    $statusCode = !is_null($res) ? $res->getStatusCode() : null;
 
     $sql = 'INSERT INTO url_checks(
         url_id,
