@@ -176,6 +176,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
     try {
         $res = $client->get($selectedUrl['name']);
         $html = $res->getBody()->getContents();
+        echo $html;
         $message = 'Страница успешно проверена';
         $this->get('flash')->addMessage('success', $message);
 
