@@ -175,13 +175,11 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
 
     try {
         $res = $client->get($selectedUrl['name']);
-        $html = $res->getBody()->getContents();
-        echo $html;
+        $html = (string) $res->getBody();
         $message = 'Страница успешно проверена';
         $this->get('flash')->addMessage('success', $message);
 
-        $document = new Document();
-        $document->loadHtml($html);
+        $document = new Document($html);
         $h1 = optional($document->first('h1'))->text();
         $title = optional($document->first('title'))->text();
         $description = optional($document->first('meta[name=description]'))->attr('content');
