@@ -4,6 +4,9 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use Slim\Factory\AppFactory;
 use Slim\Middleware\MethodOverrideMiddleware;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\RequestHandlerInterface;
+use Slim\Psr7\Response;
 use DI\Container;
 use Carbon\Carbon;
 use Valitron\Validator;
@@ -67,7 +70,19 @@ $container->set('pdo', function () {
 });
 
 $app = AppFactory::createFromContainer($container);
-$app->addErrorMiddleware(true, true, true);
+
+$app->addErrorMiddleware(false, false, false);
+
+$app->add(function ($request, $handler) {
+    $response = $handler->handle($request);
+
+    if ($response->getStatusCode() === 404) {
+        $response = new Response();
+        return $this->get('renderer')->render($response->withStatus(404), '404.phtml');
+    }
+
+    return $response;
+});
 
 $router = $app->getRouteCollector()->getRouteParser();
 
