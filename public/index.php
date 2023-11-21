@@ -201,6 +201,10 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
         $message = 'Проверка была выполнена успешно, но сервер ответил с ошибкой';
         $this->get('flash')->addMessage('warning', $message);
         return $this->get('renderer')->render($response, '500.phtml');
+    } catch (RequestException $e) {
+        $message = 'Проверка была выполнена успешно, но сервер ответил с ошибкой';
+        $this->get('flash')->addMessage('warning', $message);
+        return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
     }
 
     $sql = 'INSERT INTO url_checks(
