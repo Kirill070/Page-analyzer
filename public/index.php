@@ -67,7 +67,7 @@ $container->set('pdo', function () {
 });
 
 $app = AppFactory::createFromContainer($container);
-$app->addErrorMiddleware(false, true, true);
+$app->addErrorMiddleware(true, true, true);
 
 $router = $app->getRouteCollector()->getRouteParser();
 
