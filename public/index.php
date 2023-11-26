@@ -22,7 +22,9 @@ session_start();
 
 $container = new Container();
 $container->set('renderer', function () {
-    return new \Slim\Views\PhpRenderer(__DIR__ . '/../templates');
+    $renderer = new \Slim\Views\PhpRenderer(__DIR__ . '/../templates');
+    $renderer->setLayout('layout.phtml');
+    return $renderer;
 });
 
 $container->set('flash', function () {
@@ -71,7 +73,7 @@ $container->set('pdo', function () {
 
 $app = AppFactory::createFromContainer($container);
 
-$app->addErrorMiddleware(false, false, false);
+$app->addErrorMiddleware(true, false, false);
 
 $app->add(function ($request, $handler) {
     $response = $handler->handle($request);
@@ -86,9 +88,13 @@ $app->add(function ($request, $handler) {
 
 $router = $app->getRouteCollector()->getRouteParser();
 
-$app->get('/', function ($request, $response) {
-    return $this->get('renderer')->render($response, 'index.phtml');
-})->setName('/');
+$app->get('/', function ($request, $response) use ($router) {
+    $params = [
+        'main' => $router->urlFor('main'),
+        'urls' => $router->urlFor('urls')
+    ];
+    return $this->get('renderer')->render($response, 'main.phtml', $params);
+})->setName('main');
 
 $app->post('/urls', function ($request, $response) use ($router) {
     $url = $request->getParsedBodyParam('url');
@@ -126,7 +132,7 @@ $app->post('/urls', function ($request, $response) use ($router) {
         $this->get('flash')->addMessage('success', 'Страница уже существует');
     }
     return $response->withRedirect($router->urlFor('url', ['id' => $id]), 302);
-});
+})->setName('url.post');
 
 $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
     $id = $args['id'];
@@ -157,19 +163,11 @@ $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
         'url' => $selectedUrl,
         'checks' => $selectedUrlCheck
     ];
-    return $this->get('renderer')->render($response, 'show.phtml', $params);
+    return $this->get('renderer')->render($response, 'url.phtml', $params);
 })->setName('url');
 
 $app->get('/urls', function ($request, $response) {
     $pdo = $this->get('pdo');
-    // $sql = 'SELECT
-    //     urls.id AS id,
-    //     urls.name AS name,
-    //     MAX(url_checks.created_at) AS created_at,
-    //     url_checks.status_code AS status_code
-    //     FROM urls LEFT JOIN url_checks ON urls.id = url_checks.url_id
-    //     GROUP BY urls.id, status_code
-    //     ORDER BY id DESC';
     $sql = 'SELECT
         urls.id,
         urls.name,
@@ -194,7 +192,7 @@ $app->get('/urls', function ($request, $response) {
     $urls = $stmt->fetchAll();
 
     $params = ['data' => $urls];
-    return $this->get('renderer')->render($response, "list.phtml", $params);
+    return $this->get('renderer')->render($response, "urls.phtml", $params);
 })->setName('urls');
 
 $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) use ($router) {
@@ -255,6 +253,6 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
     $id = $pdo->lastInsertId('url_checks_id_seq');
 
     return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
-});
+})->setName('urls.checks');
 
 $app->run();
