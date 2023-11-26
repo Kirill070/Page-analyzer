@@ -90,8 +90,7 @@ $router = $app->getRouteCollector()->getRouteParser();
 
 $app->get('/', function ($request, $response) use ($router) {
     $params = [
-        'main' => $router->urlFor('main'),
-        'urls' => $router->urlFor('urls')
+        'router' => $router
     ];
     return $this->get('renderer')->render($response, 'main.phtml', $params);
 })->setName('main');
@@ -108,6 +107,7 @@ $app->post('/urls', function ($request, $response) use ($router) {
         $params = [
             'url' => $url['name'],
             'errors' => $validator->errors(),
+            'router' => $router
         ];
         return $this->get('renderer')->render($response->withStatus(422), 'index.phtml', $params);
     }
@@ -134,7 +134,7 @@ $app->post('/urls', function ($request, $response) use ($router) {
     return $response->withRedirect($router->urlFor('url', ['id' => $id]), 302);
 })->setName('url.post');
 
-$app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
+$app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) use ($router) {
     $id = $args['id'];
 
     $messages = $this->get('flash')->getMessages();
@@ -161,12 +161,13 @@ $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
         'flash' => $flash,
         'alert' => $alert,
         'url' => $selectedUrl,
-        'checks' => $selectedUrlCheck
+        'checks' => $selectedUrlCheck,
+        'router' => $router
     ];
     return $this->get('renderer')->render($response, 'url.phtml', $params);
 })->setName('url');
 
-$app->get('/urls', function ($request, $response) {
+$app->get('/urls', function ($request, $response) use ($router) {
     $pdo = $this->get('pdo');
     $sql = 'SELECT
         urls.id,
@@ -191,7 +192,10 @@ $app->get('/urls', function ($request, $response) {
     $stmt->execute();
     $urls = $stmt->fetchAll();
 
-    $params = ['data' => $urls];
+    $params = [
+        'data' => $urls,
+        'router' => $router
+    ];
     return $this->get('renderer')->render($response, "urls.phtml", $params);
 })->setName('urls');
 
