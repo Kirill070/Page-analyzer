@@ -90,7 +90,8 @@ $router = $app->getRouteCollector()->getRouteParser();
 
 $app->get('/', function ($request, $response) use ($router) {
     $params = [
-        'router' => $router
+        'router' => $router,
+        'mainActive' => 'active'
     ];
     return $this->get('renderer')->render($response, 'main.phtml', $params);
 })->setName('main');
@@ -194,7 +195,8 @@ $app->get('/urls', function ($request, $response) use ($router) {
 
     $params = [
         'data' => $urls,
-        'router' => $router
+        'router' => $router,
+        'urlsActive' => 'active'
     ];
     return $this->get('renderer')->render($response, "urls.phtml", $params);
 })->setName('urls');
