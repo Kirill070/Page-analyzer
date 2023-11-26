@@ -162,14 +162,33 @@ $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
 
 $app->get('/urls', function ($request, $response) {
     $pdo = $this->get('pdo');
+    // $sql = 'SELECT
+    //     urls.id AS id,
+    //     urls.name AS name,
+    //     MAX(url_checks.created_at) AS created_at,
+    //     url_checks.status_code AS status_code
+    //     FROM urls LEFT JOIN url_checks ON urls.id = url_checks.url_id
+    //     GROUP BY urls.id, status_code
+    //     ORDER BY id DESC';
     $sql = 'SELECT
-        urls.id AS id,
-        urls.name AS name,
-        MAX(url_checks.created_at) AS created_at,
-        url_checks.status_code AS status_code
-        FROM urls LEFT JOIN url_checks ON urls.id = url_checks.url_id
-        GROUP BY urls.id, status_code
-        ORDER BY id DESC';
+        urls.id,
+        urls.name,
+        url_checks.created_at,
+        url_checks.status_code
+    FROM
+        urls
+    LEFT JOIN (
+        SELECT
+            url_checks.url_id,
+            MAX(url_checks.created_at) AS max_created_at
+        FROM
+            url_checks
+        GROUP BY
+            url_checks.url_id
+    ) AS latest_check ON urls.id = latest_check.url_id
+    LEFT JOIN url_checks ON latest_check.url_id = url_checks.url_id
+    AND latest_check.max_created_at = url_checks.created_at
+    ORDER BY urls.id DESC;';
     $stmt = $pdo->prepare($sql);
     $stmt->execute();
     $urls = $stmt->fetchAll();
