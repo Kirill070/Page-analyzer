@@ -109,7 +109,7 @@ $app->post('/urls', function ($request, $response) use ($router) {
             'errors' => $validator->errors(),
             'router' => $router
         ];
-        return $this->get('renderer')->render($response->withStatus(422), 'index.phtml', $params);
+        return $this->get('renderer')->render($response->withStatus(422), 'main.phtml', $params);
     }
 
     $parsedUrl = parse_url(strtolower($url['name']));
