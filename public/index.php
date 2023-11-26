@@ -73,20 +73,23 @@ $container->set('pdo', function () {
 
 $app = AppFactory::createFromContainer($container);
 
-$app->addErrorMiddleware(true, false, false);
+$app->addErrorMiddleware(false, false, false);
 
-$app->add(function ($request, $handler) {
+$router = $app->getRouteCollector()->getRouteParser();
+
+$app->add(function ($request, $handler) use ($router) {
     $response = $handler->handle($request);
 
     if ($response->getStatusCode() === 404) {
         $response = new Response();
-        return $this->get('renderer')->render($response->withStatus(404), '404.phtml');
+        $params = [
+            'router' => $router
+        ];
+        return $this->get('renderer')->render($response->withStatus(404), '404.phtml', $params);
     }
 
     return $response;
 });
-
-$router = $app->getRouteCollector()->getRouteParser();
 
 $app->get('/', function ($request, $response) use ($router) {
     $params = [
@@ -132,7 +135,7 @@ $app->post('/urls', function ($request, $response) use ($router) {
         $id = $selectedUrl[0]['id'];
         $this->get('flash')->addMessage('success', 'Страница уже существует');
     }
-    return $response->withRedirect($router->urlFor('url', ['id' => $id]), 302);
+    return $response->withRedirect($router->urlFor('url', ['id' => $id]));
 })->setName('url.post');
 
 $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) use ($router) {
