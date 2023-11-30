@@ -172,18 +172,18 @@ $app->get('/urls', function ($request, $response) {
 
     $sqlUrls = 'SELECT id, name FROM urls ORDER BY id DESC';
 
-    /** @var \Illuminate\Support\Collection $urls */
-    $urls = collect($pdo->query($sqlUrls)->fetchAll(\PDO::FETCH_ASSOC));
+    $urls = $pdo->query($sqlUrls)->fetchAll(\PDO::FETCH_ASSOC);
+    $urlsData = collect($urls);
 
     $sqlUrlChecks = 'SELECT DISTINCT ON (url_id) url_id, created_at, status_code
                     FROM url_checks
                     ORDER BY url_id, created_at DESC;';
 
-    /** @var \Illuminate\Support\Collection $urlChecks */
+    /** @param \Illuminate\Support\Collection $urlChecks */
     $urlChecks = collect($pdo->query($sqlUrlChecks)->fetchAll(\PDO::FETCH_ASSOC))
         ->keyBy('url_id');
 
-    $data = $urls->map(function ($url) use ($urlChecks) {
+    $data = $urlsData->map(function ($url) use ($urlChecks) {
         return array_merge($url, $urlChecks->get($url['id'], []));
     })->all();
 
