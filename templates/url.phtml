@@ -1,9 +1,3 @@
-    <?php if ($flash) : ?>
-    <div class="alert alert-<?= $alert ?>" role="alert">
-        <?= $flash ?>
-    </div>
-    <?php endif ?>
-
     <main class="flex-grow-1">
         <div class="container-lg mt-3">
             <h1>Сайт:
@@ -34,7 +28,7 @@
                 </table>
             </div>
             <h2 class="mt-5 mb-3">Проверки</h2>
-            <form method="post" action="/urls/<?= $url['id'] ?>/checks">
+            <form method="post" action="<?= $router->urlFor('urls.checks', ['url_id' => $url['id']]) ?>">
                 <input type="submit" class="btn btn-primary" value="Запустить проверку">
             </form>
             <table class="table table-bordered table-hover mt-3" data-test="checks">

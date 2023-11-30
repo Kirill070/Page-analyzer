@@ -20,21 +20,27 @@ use Dotenv\Dotenv;
 
 session_start();
 
+$dotenv = Dotenv::createImmutable(__DIR__ . './../');
+$dotenv->safeLoad();
+
 $container = new Container();
-$container->set('renderer', function () {
-    $renderer = new \Slim\Views\PhpRenderer(__DIR__ . '/../templates');
-    $renderer->setLayout('layout.phtml');
-    return $renderer;
-});
+
+$app = AppFactory::createFromContainer($container);
 
 $container->set('flash', function () {
     return new \Slim\Flash\Messages();
 });
 
-$container->set('pdo', function () {
-    $dotenv = Dotenv::createImmutable(__DIR__ . './../');
-    $dotenv->safeLoad();
+$container->set('router', $app->getRouteCollector()->getRouteParser());
 
+$container->set('renderer', function () use ($container) {
+    $renderer = new \Slim\Views\PhpRenderer(__DIR__ . '/../templates');
+    $renderer->setLayout('layout.phtml');
+    $renderer->addAttribute('router', $container->get('router'));
+    return $renderer;
+});
+
+$container->set('pdo', function () {
     $databaseUrl = parse_url($_ENV['DATABASE_URL']);
     if (!$databaseUrl) {
         throw new \Exception("Error reading database url");
@@ -71,35 +77,27 @@ $container->set('pdo', function () {
     return $pdo;
 });
 
-$app = AppFactory::createFromContainer($container);
+$app->addErrorMiddleware(true, false, false);
 
-$app->addErrorMiddleware(false, false, false);
-
-$router = $app->getRouteCollector()->getRouteParser();
-
-$app->add(function ($request, $handler) use ($router) {
+$app->add(function ($request, $handler) {
     $response = $handler->handle($request);
 
     if ($response->getStatusCode() === 404) {
         $response = new Response();
-        $params = [
-            'router' => $router
-        ];
-        return $this->get('renderer')->render($response->withStatus(404), '404.phtml', $params);
+        return $this->get('renderer')->render($response->withStatus(404), '404.phtml');
     }
 
     return $response;
 });
 
-$app->get('/', function ($request, $response) use ($router) {
+$app->get('/', function ($request, $response) {
     $params = [
-        'router' => $router,
         'mainActive' => 'active'
     ];
     return $this->get('renderer')->render($response, 'main.phtml', $params);
 })->setName('main');
 
-$app->post('/urls', function ($request, $response) use ($router) {
+$app->post('/urls', function ($request, $response) {
     $url = $request->getParsedBodyParam('url');
 
     $validator = new Validator(['url' => $url['name']]);
@@ -110,8 +108,7 @@ $app->post('/urls', function ($request, $response) use ($router) {
     if (!$validator->validate()) {
         $params = [
             'url' => $url['name'],
-            'errors' => $validator->errors(),
-            'router' => $router
+            'errors' => $validator->errors()
         ];
         return $this->get('renderer')->render($response->withStatus(422), 'main.phtml', $params);
     }
@@ -135,10 +132,10 @@ $app->post('/urls', function ($request, $response) use ($router) {
         $id = $selectedUrl[0]['id'];
         $this->get('flash')->addMessage('success', 'Страница уже существует');
     }
-    return $response->withRedirect($router->urlFor('url', ['id' => $id]));
+    return $response->withRedirect($this->get('router')->urlFor('url', ['id' => $id]));
 })->setName('url.post');
 
-$app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) use ($router) {
+$app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
     $id = $args['id'];
 
     $messages = $this->get('flash')->getMessages();
@@ -165,13 +162,12 @@ $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) use (
         'flash' => $flash,
         'alert' => $alert,
         'url' => $selectedUrl,
-        'checks' => $selectedUrlCheck,
-        'router' => $router
+        'checks' => $selectedUrlCheck
     ];
     return $this->get('renderer')->render($response, 'url.phtml', $params);
 })->setName('url');
 
-$app->get('/urls', function ($request, $response) use ($router) {
+$app->get('/urls', function ($request, $response) {
     $pdo = $this->get('pdo');
     $sql = 'SELECT
         urls.id,
@@ -198,13 +194,12 @@ $app->get('/urls', function ($request, $response) use ($router) {
 
     $params = [
         'data' => $urls,
-        'router' => $router,
         'urlsActive' => 'active'
     ];
     return $this->get('renderer')->render($response, "urls.phtml", $params);
 })->setName('urls');
 
-$app->post('/urls/{url_id}/checks', function ($request, $response, array $args) use ($router) {
+$app->post('/urls/{url_id}/checks', function ($request, $response, array $args) {
     $url_id = $args['url_id'];
 
     $pdo = $this->get('pdo');
@@ -229,7 +224,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
     } catch (ConnectException $e) {
         $message = 'Произошла ошибка при проверке, не удалось подключиться';
         $this->get('flash')->addMessage('danger', $message);
-        return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
+        return $response->withRedirect($this->get('router')->urlFor('url', ['id' => $url_id]));
     } catch (ClientException $e) {
         $res = $e->getResponse();
         $statusCode = $res->getStatusCode();
@@ -245,7 +240,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
     } catch (RequestException $e) {
         $message = 'Проверка была выполнена успешно, но сервер ответил с ошибкой';
         $this->get('flash')->addMessage('warning', $message);
-        return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
+        return $response->withRedirect($this->get('router')->urlFor('url', ['id' => $url_id]));
     }
 
     $sql = 'INSERT INTO url_checks(
@@ -261,7 +256,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
     $stmt->execute([$url_id, $statusCode, $h1, $title, $description, Carbon::now()]);
     $id = $pdo->lastInsertId('url_checks_id_seq');
 
-    return $response->withRedirect($router->urlFor('url', ['id' => $url_id]));
+    return $response->withRedirect($this->get('router')->urlFor('url', ['id' => $url_id]));
 })->setName('urls.checks');
 
 $app->run();

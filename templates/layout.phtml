@@ -35,6 +35,12 @@
     </nav>
   </header>
 
+  <?php if ($flash) : ?>
+    <div class="alert alert-<?= $alert ?>" role="alert">
+        <?= $flash ?>
+    </div>
+  <?php endif ?>
+
   <?= $content ?>
 
   </body>
