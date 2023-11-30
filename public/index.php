@@ -92,10 +92,10 @@ $app->add(function ($request, $handler) {
 
 $app->get('/', function ($request, $response) {
     $params = [
-        'mainActive' => 'active'
+        'homeActive' => 'active'
     ];
-    return $this->get('renderer')->render($response, 'main.phtml', $params);
-})->setName('main');
+    return $this->get('renderer')->render($response, 'home.phtml', $params);
+})->setName('home');
 
 $app->post('/urls', function ($request, $response) {
     $url = $request->getParsedBodyParam('url');
@@ -110,7 +110,7 @@ $app->post('/urls', function ($request, $response) {
             'url' => $url['name'],
             'errors' => $validator->errors()
         ];
-        return $this->get('renderer')->render($response->withStatus(422), 'main.phtml', $params);
+        return $this->get('renderer')->render($response->withStatus(422), 'home.phtml', $params);
     }
 
     $parsedUrl = parse_url(strtolower($url['name']));
@@ -132,8 +132,8 @@ $app->post('/urls', function ($request, $response) {
         $id = $selectedUrl[0]['id'];
         $this->get('flash')->addMessage('success', 'Страница уже существует');
     }
-    return $response->withRedirect($this->get('router')->urlFor('url', ['id' => $id]));
-})->setName('url.post');
+    return $response->withRedirect($this->get('router')->urlFor('urls.show', ['id' => $id]));
+})->setName('urls.store');
 
 $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
     $id = $args['id'];
@@ -164,40 +164,53 @@ $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
         'url' => $selectedUrl,
         'checks' => $selectedUrlCheck
     ];
-    return $this->get('renderer')->render($response, 'url.phtml', $params);
-})->setName('url');
+    return $this->get('renderer')->render($response, 'show.phtml', $params);
+})->setName('urls.show');
 
 $app->get('/urls', function ($request, $response) {
     $pdo = $this->get('pdo');
-    $sql = 'SELECT
-        urls.id,
-        urls.name,
-        url_checks.created_at,
-        url_checks.status_code
-    FROM
-        urls
-    LEFT JOIN (
-        SELECT
-            url_checks.url_id,
-            MAX(url_checks.created_at) AS max_created_at
-        FROM
-            url_checks
-        GROUP BY
-            url_checks.url_id
-    ) AS latest_check ON urls.id = latest_check.url_id
-    LEFT JOIN url_checks ON latest_check.url_id = url_checks.url_id
-    AND latest_check.max_created_at = url_checks.created_at
-    ORDER BY urls.id DESC;';
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute();
-    $urls = $stmt->fetchAll();
+    // $sql = 'SELECT
+    //     urls.id,
+    //     urls.name,
+    //     url_checks.created_at,
+    //     url_checks.status_code
+    // FROM
+    //     urls
+    // LEFT JOIN (
+    //     SELECT
+    //         url_checks.url_id,
+    //         MAX(url_checks.created_at) AS max_created_at
+    //     FROM
+    //         url_checks
+    //     GROUP BY
+    //         url_checks.url_id
+    // ) AS latest_check ON urls.id = latest_check.url_id
+    // LEFT JOIN url_checks ON latest_check.url_id = url_checks.url_id
+    // AND latest_check.max_created_at = url_checks.created_at
+    // ORDER BY urls.id DESC;';
+    // $stmt = $pdo->prepare($sql);
+    // $stmt->execute();
+    // $urls = $stmt->fetchAll();
+
+    $sqlUrls = 'SELECT id, name FROM urls ORDER BY id DESC';
+    $urls = collect($pdo->query($sqlUrls)->fetchAll(\PDO::FETCH_ASSOC));
+
+    $sqlUrlChecks = 'SELECT DISTINCT ON (url_id) url_id, created_at, status_code
+                    FROM url_checks
+                    ORDER BY url_id, created_at DESC;';
+    $urlChecks = collect($pdo->query($sqlUrlChecks)->fetchAll(\PDO::FETCH_ASSOC))
+        ->keyBy('url_id');
+
+    $data = $urls->map(function ($url) use ($urlChecks) {
+        return array_merge($url, $urlChecks->get($url['id'], []));
+    })->all();
 
     $params = [
-        'data' => $urls,
-        'urlsActive' => 'active'
+        'data' => $data,
+        'indexActive' => 'active'
     ];
-    return $this->get('renderer')->render($response, "urls.phtml", $params);
-})->setName('urls');
+    return $this->get('renderer')->render($response, "index.phtml", $params);
+})->setName('urls.index');
 
 $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) {
     $url_id = $args['url_id'];
@@ -224,7 +237,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
     } catch (ConnectException $e) {
         $message = 'Произошла ошибка при проверке, не удалось подключиться';
         $this->get('flash')->addMessage('danger', $message);
-        return $response->withRedirect($this->get('router')->urlFor('url', ['id' => $url_id]));
+        return $response->withRedirect($this->get('router')->urlFor('urls.show', ['id' => $url_id]));
     } catch (ClientException $e) {
         $res = $e->getResponse();
         $statusCode = $res->getStatusCode();
@@ -240,7 +253,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
     } catch (RequestException $e) {
         $message = 'Проверка была выполнена успешно, но сервер ответил с ошибкой';
         $this->get('flash')->addMessage('warning', $message);
-        return $response->withRedirect($this->get('router')->urlFor('url', ['id' => $url_id]));
+        return $response->withRedirect($this->get('router')->urlFor('urls.show', ['id' => $url_id]));
     }
 
     $sql = 'INSERT INTO url_checks(
@@ -256,7 +269,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
     $stmt->execute([$url_id, $statusCode, $h1, $title, $description, Carbon::now()]);
     $id = $pdo->lastInsertId('url_checks_id_seq');
 
-    return $response->withRedirect($this->get('router')->urlFor('url', ['id' => $url_id]));
-})->setName('urls.checks');
+    return $response->withRedirect($this->get('router')->urlFor('urls.show', ['id' => $url_id]));
+})->setName('urls.check');
 
 $app->run();
