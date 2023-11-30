@@ -4,6 +4,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use Slim\Factory\AppFactory;
 use Slim\Middleware\MethodOverrideMiddleware;
+use Slim\Exception\HttpNotFoundException;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use Slim\Psr7\Response;
@@ -26,6 +27,7 @@ $dotenv->safeLoad();
 $container = new Container();
 
 $app = AppFactory::createFromContainer($container);
+$app->addRoutingMiddleware();
 
 $container->set('flash', function () {
     return new \Slim\Flash\Messages();
@@ -77,18 +79,20 @@ $container->set('pdo', function () {
     return $pdo;
 });
 
-$app->addErrorMiddleware(true, false, false);
-
-$app->add(function ($request, $handler) {
-    $response = $handler->handle($request);
-
-    if ($response->getStatusCode() === 404) {
-        $response = new Response();
+$customErrorHandler = function (
+    ServerRequestInterface $request,
+    Throwable $exception
+) use ($app) {
+    if ($exception instanceof HttpNotFoundException) {
+        $response = $app->getResponseFactory()->createResponse(404);
         return $this->get('renderer')->render($response->withStatus(404), '404.phtml');
+    } else {
+        $response = $app->getResponseFactory()->createResponse(500);
+        return $this->get('renderer')->render($response->withStatus(500), '500.phtml');
     }
-
-    return $response;
-});
+};
+$errorMiddleware = $app->addErrorMiddleware(false, false, false);
+$errorMiddleware->setDefaultErrorHandler($customErrorHandler);
 
 $app->get('/', function ($request, $response) {
     $params = [
@@ -147,7 +151,7 @@ $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
     $selectedUrl = $stmt->fetch();
 
     if (!$selectedUrl) {
-        return $response->withStatus(404)->write('Page not found');
+        return $this->get('renderer')->render($response->withStatus(404), '404.phtml');
     }
 
     $sql = 'SELECT * FROM url_checks WHERE url_id = ? ORDER BY created_at DESC';
@@ -173,19 +177,26 @@ $app->get('/urls', function ($request, $response) {
     $sqlUrls = 'SELECT id, name FROM urls ORDER BY id DESC';
 
     $urls = $pdo->query($sqlUrls)->fetchAll(\PDO::FETCH_ASSOC);
-    $urlsData = collect($urls);
 
-    $sqlUrlChecks = 'SELECT DISTINCT ON (url_id) url_id, created_at, status_code
-                    FROM url_checks
-                    ORDER BY url_id, created_at DESC;';
+    $sqlUrlChecks = 'SELECT
+                        DISTINCT ON (url_id) url_id, created_at, status_code
+                        FROM url_checks
+                        ORDER BY url_id, created_at DESC;';
 
-    /** @param \Illuminate\Support\Collection $urlChecks */
-    $urlChecks = collect($pdo->query($sqlUrlChecks)->fetchAll(\PDO::FETCH_ASSOC))
-        ->keyBy('url_id');
+    $urlChecksData = $pdo->query($sqlUrlChecks)->fetchAll(\PDO::FETCH_ASSOC);
 
-    $data = $urlsData->map(function ($url) use ($urlChecks) {
-        return array_merge($url, $urlChecks->get($url['id'], []));
-    })->all();
+    $urlChecks = [];
+    foreach ($urlChecksData as $data) {
+        $urlChecks[$data['url_id']] = $data;
+    }
+
+    $data = [];
+    foreach ($urls as $url) {
+        $urlId = $url['id'];
+        $url['created_at'] = $urlChecks[$urlId]['created_at'] ?? null;
+        $url['status_code'] = $urlChecks[$urlId]['status_code'] ?? null;
+        $data[] = $url;
+    }
 
     $params = [
         'data' => $data,
@@ -228,10 +239,6 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
         $description = '';
         $message = 'Проверка была выполнена успешно, но сервер ответил с ошибкой';
         $this->get('flash')->addMessage('warning', $message);
-    } catch (ServerException $e) {
-        $message = 'Проверка была выполнена успешно, но сервер ответил с ошибкой';
-        $this->get('flash')->addMessage('warning', $message);
-        return $this->get('renderer')->render($response, '500.phtml');
     } catch (RequestException $e) {
         $message = 'Проверка была выполнена успешно, но сервер ответил с ошибкой';
         $this->get('flash')->addMessage('warning', $message);
