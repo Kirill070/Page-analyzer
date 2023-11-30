@@ -169,35 +169,17 @@ $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
 
 $app->get('/urls', function ($request, $response) {
     $pdo = $this->get('pdo');
-    // $sql = 'SELECT
-    //     urls.id,
-    //     urls.name,
-    //     url_checks.created_at,
-    //     url_checks.status_code
-    // FROM
-    //     urls
-    // LEFT JOIN (
-    //     SELECT
-    //         url_checks.url_id,
-    //         MAX(url_checks.created_at) AS max_created_at
-    //     FROM
-    //         url_checks
-    //     GROUP BY
-    //         url_checks.url_id
-    // ) AS latest_check ON urls.id = latest_check.url_id
-    // LEFT JOIN url_checks ON latest_check.url_id = url_checks.url_id
-    // AND latest_check.max_created_at = url_checks.created_at
-    // ORDER BY urls.id DESC;';
-    // $stmt = $pdo->prepare($sql);
-    // $stmt->execute();
-    // $urls = $stmt->fetchAll();
 
     $sqlUrls = 'SELECT id, name FROM urls ORDER BY id DESC';
+
+    /** @var \Illuminate\Support\Collection $urls */
     $urls = collect($pdo->query($sqlUrls)->fetchAll(\PDO::FETCH_ASSOC));
 
     $sqlUrlChecks = 'SELECT DISTINCT ON (url_id) url_id, created_at, status_code
                     FROM url_checks
                     ORDER BY url_id, created_at DESC;';
+
+    /** @var \Illuminate\Support\Collection $urlChecks */
     $urlChecks = collect($pdo->query($sqlUrlChecks)->fetchAll(\PDO::FETCH_ASSOC))
         ->keyBy('url_id');
 
