@@ -85,13 +85,13 @@ $customErrorHandler = function (
 ) use ($app) {
     if ($exception instanceof HttpNotFoundException) {
         $response = $app->getResponseFactory()->createResponse(404);
-        return $this->get('renderer')->render($response->withStatus(404), '404.phtml');
+        return $this->get('renderer')->render($response->withStatus(404), 'errors/404.phtml');
     } else {
         $response = $app->getResponseFactory()->createResponse(500);
-        return $this->get('renderer')->render($response->withStatus(500), '500.phtml');
+        return $this->get('renderer')->render($response->withStatus(500), 'errors/500.phtml');
     }
 };
-$errorMiddleware = $app->addErrorMiddleware(false, false, false);
+$errorMiddleware = $app->addErrorMiddleware(true, true, true);
 $errorMiddleware->setDefaultErrorHandler($customErrorHandler);
 
 $app->get('/', function ($request, $response) {
@@ -151,7 +151,7 @@ $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
     $selectedUrl = $stmt->fetch();
 
     if (!$selectedUrl) {
-        return $this->get('renderer')->render($response->withStatus(404), '404.phtml');
+        return $this->get('renderer')->render($response->withStatus(404), 'errors/404.phtml');
     }
 
     $sql = 'SELECT * FROM url_checks WHERE url_id = ? ORDER BY created_at DESC';
@@ -168,7 +168,7 @@ $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
         'url' => $selectedUrl,
         'checks' => $selectedUrlCheck
     ];
-    return $this->get('renderer')->render($response, 'show.phtml', $params);
+    return $this->get('renderer')->render($response, 'urls/show.phtml', $params);
 })->setName('urls.show');
 
 $app->get('/urls', function ($request, $response) {
@@ -202,7 +202,7 @@ $app->get('/urls', function ($request, $response) {
         'data' => $data,
         'indexActive' => 'active'
     ];
-    return $this->get('renderer')->render($response, "index.phtml", $params);
+    return $this->get('renderer')->render($response, "urls/index.phtml", $params);
 })->setName('urls.index');
 
 $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) {

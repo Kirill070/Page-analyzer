@@ -24,18 +24,18 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav">
           <li class="nav-item">
-            <a class="nav-link <?= $homeActive ?>" href="<?= $router->urlFor('home') ?>">Главная</a>
+            <a class="nav-link <?= isset($homeActive) ? $homeActive : '' ?>" href="<?= $router->urlFor('home') ?>">Главная</a>
           </li>
 
           <li class="nav-item">
-            <a class="nav-link <?= $indexActive ?>" href="<?= $router->urlFor('urls.index') ?>">Сайты</a>
+            <a class="nav-link <?= isset($indexActive) ? $indexActive : '' ?>" href="<?= $router->urlFor('urls.index') ?>">Сайты</a>
           </li>
         </ul>
       </div>
     </nav>
   </header>
 
-  <?php if ($flash) : ?>
+  <?php if (isset($flash)) : ?>
     <div class="alert alert-<?= $alert ?>" role="alert">
         <?= $flash ?>
     </div>
