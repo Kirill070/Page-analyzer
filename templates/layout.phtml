@@ -36,9 +36,11 @@
   </header>
 
   <?php if (isset($flash)) : ?>
-    <div class="alert alert-<?= $alert ?>" role="alert">
-        <?= $flash ?>
-    </div>
+    <?php foreach ($flash as $alert => $messages) : ?>
+      <?php foreach ($messages as $message) : ?>
+        <div class="alert alert-<?= $alert ?>" role="alert"><?= $message ?></div>
+      <?php endforeach ?>
+    <?php endforeach ?>
   <?php endif ?>
 
   <?= $content ?>

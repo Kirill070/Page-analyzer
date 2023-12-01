@@ -39,6 +39,7 @@ $container->set('renderer', function () use ($container) {
     $renderer = new \Slim\Views\PhpRenderer(__DIR__ . '/../templates');
     $renderer->setLayout('layout.phtml');
     $renderer->addAttribute('router', $container->get('router'));
+    $renderer->addAttribute('flash', $container->get('flash')->getMessages());
     return $renderer;
 });
 
@@ -91,7 +92,7 @@ $customErrorHandler = function (
         return $this->get('renderer')->render($response->withStatus(500), 'errors/500.phtml');
     }
 };
-$errorMiddleware = $app->addErrorMiddleware(true, true, true);
+$errorMiddleware = $app->addErrorMiddleware(false, false, false);
 $errorMiddleware->setDefaultErrorHandler($customErrorHandler);
 
 $app->get('/', function ($request, $response) {
@@ -142,8 +143,6 @@ $app->post('/urls', function ($request, $response) {
 $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
     $id = $args['id'];
 
-    $messages = $this->get('flash')->getMessages();
-
     $pdo = $this->get('pdo');
     $sql = 'SELECT * FROM urls WHERE id = ?';
     $stmt = $pdo->prepare($sql);
@@ -159,12 +158,7 @@ $app->get('/urls/{id:[0-9]+}', function ($request, $response, array $args) {
     $stmt->execute([$id]);
     $selectedUrlCheck = $stmt->fetchAll();
 
-    $alert = array_key_first($messages) ?? '';
-    $flash = $messages[$alert][0] ?? '';
-
     $params = [
-        'flash' => $flash,
-        'alert' => $alert,
         'url' => $selectedUrl,
         'checks' => $selectedUrlCheck
     ];
