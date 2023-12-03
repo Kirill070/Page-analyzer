@@ -98,7 +98,7 @@ $errorMiddleware->setDefaultErrorHandler($customErrorHandler);
 
 $app->get('/', function ($request, $response) {
     $routeContext = RouteContext::fromRequest($request);
-    $routeName = $routeContext->getRoute()->getName();
+    $routeName = $routeContext ? $routeContext->getRoute()->getName() : '';
 
     $params = [
         'routeName' => $routeName
@@ -197,7 +197,7 @@ $app->get('/urls', function ($request, $response) {
     }
 
     $routeContext = RouteContext::fromRequest($request);
-    $routeName = $routeContext->getRoute()->getName();
+    $routeName = $routeContext ? $routeContext->getRoute()->getName() : '';
 
     $params = [
         'data' => $data,
@@ -206,7 +206,7 @@ $app->get('/urls', function ($request, $response) {
     return $this->get('renderer')->render($response, "urls/index.phtml", $params);
 })->setName('urls.index');
 
-$app->post('/urls/{url_id}/checks', function ($request, $response, array $args) {
+$app->post('/urls/{url_id:[0-9]+}/checks', function ($request, $response, array $args) {
     $url_id = $args['url_id'];
 
     $pdo = $this->get('pdo');
@@ -235,9 +235,9 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
     } catch (ClientException $e) {
         $res = $e->getResponse();
         $statusCode = $res->getStatusCode();
-        $h1 = 'Доступ ограничен: проблема с IP';
-        $title = 'Доступ ограничен: проблема с IP';
-        $description = '';
+        $h1 = optional($document->first('h1'))->text();
+        $title = optional($document->first('title'))->text();
+        $description = optional($document->first('meta[name=description]'))->attr('content');
         $message = 'Проверка была выполнена успешно, но сервер ответил с ошибкой';
         $this->get('flash')->addMessage('warning', $message);
     } catch (RequestException $e) {
@@ -246,7 +246,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
         return $response->withRedirect($this->get('router')->urlFor('urls.show', ['id' => $url_id]));
     }
 
-    $sql = 'INSERT INTO url_checks(
+    $sql = 'INSERT INTO url_checks (
         url_id,
         status_code,
         h1, 
@@ -254,9 +254,16 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, array $args) 
         description,
         created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?)';
+        VALUES (:url_id, :status_code, :h1, :title, :description, :created_at)';
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$url_id, $statusCode, $h1, $title, $description, Carbon::now()]);
+    $stmt->execute([
+        'url_id' => $url_id,
+        'status_code' => $statusCode,
+        'h1' => $h1,
+        'title' => $title,
+        'description' => $description,
+        'created_at' => Carbon::now(),
+    ]);
     $id = $pdo->lastInsertId('url_checks_id_seq');
 
     return $response->withRedirect($this->get('router')->urlFor('urls.show', ['id' => $url_id]));
