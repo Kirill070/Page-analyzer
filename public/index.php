@@ -98,7 +98,8 @@ $errorMiddleware->setDefaultErrorHandler($customErrorHandler);
 
 $app->get('/', function ($request, $response) {
     $routeContext = RouteContext::fromRequest($request);
-    $routeName = isset($routeContext) ? $routeContext->getRoute()->getName() : '';
+    $route = $routeContext->getRoute();
+    $routeName = !empty($route) ? $route->getName() : '';
 
     $params = [
         'routeName' => $routeName
@@ -197,7 +198,8 @@ $app->get('/urls', function ($request, $response) {
     }
 
     $routeContext = RouteContext::fromRequest($request);
-    $routeName = isset($routeContext) ? $routeContext->getRoute()->getName() : '';
+    $route = $routeContext->getRoute();
+    $routeName = !empty($route) ? $route->getName() : '';
 
     $params = [
         'data' => $data,
@@ -219,25 +221,14 @@ $app->post('/urls/{url_id:[0-9]+}/checks', function ($request, $response, array 
 
     try {
         $res = $client->get($selectedUrl['name']);
-        // $html = (string) $res->getBody();
-        // $statusCode = $res->getStatusCode();
         $message = 'Страница успешно проверена';
         $this->get('flash')->addMessage('success', $message);
-
-        // $document = new Document($html);
-        // $h1 = optional($document->first('h1'))->text();
-        // $title = optional($document->first('title'))->text();
-        // $description = optional($document->first('meta[name=description]'))->attr('content');
     } catch (ConnectException $e) {
         $message = 'Произошла ошибка при проверке, не удалось подключиться';
         $this->get('flash')->addMessage('danger', $message);
         return $response->withRedirect($this->get('router')->urlFor('urls.show', ['id' => $url_id]));
     } catch (ClientException $e) {
         $res = $e->getResponse();
-        // $statusCode = $res->getStatusCode();
-        // $h1 = optional($document->first('h1'))->text();
-        // $title = optional($document->first('title'))->text();
-        // $description = optional($document->first('meta[name=description]'))->attr('content');
         $message = 'Проверка была выполнена успешно, но сервер ответил с ошибкой';
         $this->get('flash')->addMessage('warning', $message);
     } catch (RequestException $e) {
