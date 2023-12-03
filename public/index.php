@@ -198,7 +198,8 @@ $app->get('/urls', function ($request, $response) {
     // }
 
     $urlChecks = collect($urlChecksData)->keyBy('url_id');
-    $urls = collect($urlsData);
+    //$urls = new Collection();
+    $urls = collect((array) $urlsData);
 
     $data = $urls->map(function ($url) use ($urlChecks) {
         return array_merge($url, $urlChecks->get($url['id'], []));
