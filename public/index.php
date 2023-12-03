@@ -93,7 +93,7 @@ $customErrorHandler = function (
         return $this->get('renderer')->render($response->withStatus(500), 'errors/500.phtml');
     }
 };
-$errorMiddleware = $app->addErrorMiddleware(true, true, true);
+$errorMiddleware = $app->addErrorMiddleware(false, false, false);
 $errorMiddleware->setDefaultErrorHandler($customErrorHandler);
 
 $app->get('/', function ($request, $response) {
@@ -184,21 +184,7 @@ $app->get('/urls', function ($request, $response) {
 
     $urlChecksData = $pdo->query($sqlUrlChecks)->fetchAll(\PDO::FETCH_ASSOC);
 
-    // $urlChecks = [];
-    // foreach ($urlChecksData as $data) {
-    //     $urlChecks[$data['url_id']] = $data;
-    // }
-
-    // $data = [];
-    // foreach ($urls as $url) {
-    //     $urlId = $url['id'];
-    //     $url['created_at'] = $urlChecks[$urlId]['created_at'] ?? null;
-    //     $url['status_code'] = $urlChecks[$urlId]['status_code'] ?? null;
-    //     $data[] = $url;
-    // }
-
-    $urlChecks = collect($urlChecksData)->keyBy('url_id');
-    //$urls = new Collection();
+    $urlChecks = collect((array) $urlChecksData)->keyBy('url_id');
     $urls = collect((array) $urlsData);
 
     $data = $urls->map(function ($url) use ($urlChecks) {
