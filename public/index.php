@@ -5,6 +5,7 @@ require __DIR__ . '/../vendor/autoload.php';
 use Slim\Factory\AppFactory;
 use Slim\Middleware\MethodOverrideMiddleware;
 use Slim\Exception\HttpNotFoundException;
+use Slim\Routing\RouteContext;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use Slim\Psr7\Response;
@@ -92,12 +93,15 @@ $customErrorHandler = function (
         return $this->get('renderer')->render($response->withStatus(500), 'errors/500.phtml');
     }
 };
-$errorMiddleware = $app->addErrorMiddleware(false, false, false);
+$errorMiddleware = $app->addErrorMiddleware(true, true, true);
 $errorMiddleware->setDefaultErrorHandler($customErrorHandler);
 
 $app->get('/', function ($request, $response) {
+    $routeContext = RouteContext::fromRequest($request);
+    $routeName = $routeContext->getRoute()->getName();
+
     $params = [
-        'homeActive' => 'active'
+        'routeName' => $routeName
     ];
     return $this->get('renderer')->render($response, 'home.phtml', $params);
 })->setName('home');
@@ -118,14 +122,14 @@ $app->post('/urls', function ($request, $response) {
         return $this->get('renderer')->render($response->withStatus(422), 'home.phtml', $params);
     }
 
-    $parsedUrl = parse_url(strtolower($url['name']));
+    $parsedUrl = parse_url(mb_strtolower($url['name']));
     $normalizedUrl = "{$parsedUrl['scheme']}://{$parsedUrl['host']}";
 
     $pdo = $this->get('pdo');
     $sql = 'SELECT * FROM urls WHERE name = ?';
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$normalizedUrl]);
-    $selectedUrl = $stmt->fetchAll();
+    $selectedUrl = $stmt->fetch();
 
     if (!$selectedUrl) {
         $sql = 'INSERT INTO urls(name, created_at) VALUES(?, ?)';
@@ -134,7 +138,7 @@ $app->post('/urls', function ($request, $response) {
         $id = $pdo->lastInsertId('urls_id_seq');
         $this->get('flash')->addMessage('success', 'Страница успешно добавлена');
     } else {
-        $id = $selectedUrl[0]['id'];
+        $id = $selectedUrl['id'];
         $this->get('flash')->addMessage('success', 'Страница уже существует');
     }
     return $response->withRedirect($this->get('router')->urlFor('urls.show', ['id' => $id]));
@@ -192,9 +196,12 @@ $app->get('/urls', function ($request, $response) {
         $data[] = $url;
     }
 
+    $routeContext = RouteContext::fromRequest($request);
+    $routeName = $routeContext->getRoute()->getName();
+
     $params = [
         'data' => $data,
-        'indexActive' => 'active'
+        'routeName' => $routeName
     ];
     return $this->get('renderer')->render($response, "urls/index.phtml", $params);
 })->setName('urls.index');
