@@ -20,10 +20,10 @@
                                     <?= $url['name'] ?>
                                 </a></td>
                             <td>
-                                <?= $url['created_at'] ?>
+                                <?= $url['created_at'] ?? ''?>
                             </td>
                             <td>
-                                <?= $url['status_code'] ?>
+                                <?= $url['status_code'] ?? ''?>
                             </td>
                         </tr>
                         <?php endforeach ?>

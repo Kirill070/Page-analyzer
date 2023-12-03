@@ -175,7 +175,7 @@ $app->get('/urls', function ($request, $response) {
 
     $sqlUrls = 'SELECT id, name FROM urls ORDER BY id DESC';
 
-    $urls = $pdo->query($sqlUrls)->fetchAll(\PDO::FETCH_ASSOC);
+    $urlsData = $pdo->query($sqlUrls)->fetchAll(\PDO::FETCH_ASSOC);
 
     $sqlUrlChecks = 'SELECT
                         DISTINCT ON (url_id) url_id, created_at, status_code
@@ -184,18 +184,25 @@ $app->get('/urls', function ($request, $response) {
 
     $urlChecksData = $pdo->query($sqlUrlChecks)->fetchAll(\PDO::FETCH_ASSOC);
 
-    $urlChecks = [];
-    foreach ($urlChecksData as $data) {
-        $urlChecks[$data['url_id']] = $data;
-    }
+    // $urlChecks = [];
+    // foreach ($urlChecksData as $data) {
+    //     $urlChecks[$data['url_id']] = $data;
+    // }
 
-    $data = [];
-    foreach ($urls as $url) {
-        $urlId = $url['id'];
-        $url['created_at'] = $urlChecks[$urlId]['created_at'] ?? null;
-        $url['status_code'] = $urlChecks[$urlId]['status_code'] ?? null;
-        $data[] = $url;
-    }
+    // $data = [];
+    // foreach ($urls as $url) {
+    //     $urlId = $url['id'];
+    //     $url['created_at'] = $urlChecks[$urlId]['created_at'] ?? null;
+    //     $url['status_code'] = $urlChecks[$urlId]['status_code'] ?? null;
+    //     $data[] = $url;
+    // }
+
+    $urlChecks = collect($urlChecksData)->keyBy('url_id');
+    $urls = collect($urlsData);
+
+    $data = $urls->map(function ($url) use ($urlChecks) {
+        return array_merge($url, $urlChecks->get($url['id'], []));
+    })->all();
 
     $routeContext = RouteContext::fromRequest($request);
     $route = $routeContext->getRoute();
