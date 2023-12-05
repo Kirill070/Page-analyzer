@@ -44,7 +44,7 @@ $container->set('flash', function () {
 
 $container->set('router', $app->getRouteCollector()->getRouteParser());
 
-$container->set('renderer', function () use ($container, $app) {
+$container->set('renderer', function () use ($container) {
     $renderer = new \Slim\Views\PhpRenderer(__DIR__ . '/../templates');
     $renderer->setLayout('layout.phtml');
     $renderer->addAttribute('router', $container->get('router'));
