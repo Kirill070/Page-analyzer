@@ -28,7 +28,15 @@ $dotenv->safeLoad();
 $container = new Container();
 
 $app = AppFactory::createFromContainer($container);
-$app->addRoutingMiddleware();
+
+$app->add(function (ServerRequestInterface $request, RequestHandlerInterface $handler) use ($container) {
+    $routeContext = RouteContext::fromRequest($request);
+    $route = $routeContext->getRoute();
+
+    $container->set('routeName', $routeName = !empty($route) ? $route->getName() : '');
+
+    return $handler->handle($request);
+});
 
 $container->set('flash', function () {
     return new \Slim\Flash\Messages();
@@ -36,11 +44,12 @@ $container->set('flash', function () {
 
 $container->set('router', $app->getRouteCollector()->getRouteParser());
 
-$container->set('renderer', function () use ($container) {
+$container->set('renderer', function () use ($container, $app) {
     $renderer = new \Slim\Views\PhpRenderer(__DIR__ . '/../templates');
     $renderer->setLayout('layout.phtml');
     $renderer->addAttribute('router', $container->get('router'));
     $renderer->addAttribute('flash', $container->get('flash')->getMessages());
+    $renderer->addAttribute('routeName', $container->get('routeName'));
     return $renderer;
 });
 
@@ -81,6 +90,8 @@ $container->set('pdo', function () {
     return $pdo;
 });
 
+$app->addRoutingMiddleware();
+
 $customErrorHandler = function (
     ServerRequestInterface $request,
     Throwable $exception
@@ -97,14 +108,7 @@ $errorMiddleware = $app->addErrorMiddleware(false, false, false);
 $errorMiddleware->setDefaultErrorHandler($customErrorHandler);
 
 $app->get('/', function ($request, $response) {
-    $routeContext = RouteContext::fromRequest($request);
-    $route = $routeContext->getRoute();
-    $routeName = !empty($route) ? $route->getName() : '';
-
-    $params = [
-        'routeName' => $routeName
-    ];
-    return $this->get('renderer')->render($response, 'home.phtml', $params);
+    return $this->get('renderer')->render($response, 'home.phtml');
 })->setName('home');
 
 $app->post('/urls', function ($request, $response) {
@@ -191,13 +195,8 @@ $app->get('/urls', function ($request, $response) {
         return array_merge($url, $urlChecks->get($url['id'], []));
     })->all();
 
-    $routeContext = RouteContext::fromRequest($request);
-    $route = $routeContext->getRoute();
-    $routeName = !empty($route) ? $route->getName() : '';
-
     $params = [
-        'data' => $data,
-        'routeName' => $routeName
+        'data' => $data
     ];
     return $this->get('renderer')->render($response, "urls/index.phtml", $params);
 })->setName('urls.index');
