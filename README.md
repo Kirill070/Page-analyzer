@@ -1,6 +1,6 @@
 ### Hexlet tests and linter status:
 [![Actions Status](https://github.com/Kirill070/php-project-9/workflows/hexlet-check/badge.svg)](https://github.com/Kirill070/php-project-9/actions)<br>
-<a href="https://codeclimate.com/github/Kirill070/php-project-9/maintainability"><img src="https://api.codeclimate.com/v1/badges/cc3bd59c8d81ce653a91/maintainability" /></a><br>
+<a href="https://qlty.sh/gh/Kirill070/projects/Page-analyzer"><img src="https://qlty.sh/badges/64cf3d78-99d6-419e-a302-a4e360b16ff2/maintainability.svg" alt="Maintainability" /></a><br>
 [![Page Analyzer](https://github.com/Kirill070/php-project-9/actions/workflows/my-check.yml/badge.svg)](https://github.com/Kirill070/php-project-9/actions/workflows/my-check.yml)<br>
 
 ## Описание:
